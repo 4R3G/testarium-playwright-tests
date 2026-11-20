@@ -1,0 +1,35 @@
+{
+  "name": "testarium-e2e",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Testy end-to-end aplikacji Testarium (TypeScript + Playwright)",
+  "packageManager": "pnpm@11.21.0",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "env:up": "node scripts/environment.mts --infra",
+    "env:start": "node scripts/environment.mts",
+    "test": "playwright test",
+    "test:smoke": "playwright test --grep @smoke",
+    "test:ui": "playwright test --ui",
+    "test:headed": "playwright test --headed --project=chromium",
+    "test:api": "playwright test --project=api",
+    "report": "playwright show-report",
+    "lint": "eslint .",
+    "typecheck": "tsc --noEmit",
+    "format": "prettier --write .",
+    "format:check": "prettier --check ."
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "@playwright/test": "^1.65.1",
+    "@types/node": "^26.6.6",
+    "dotenv": "^18.0.10",
+    "eslint": "^10.15.0",
+    "eslint-plugin-playwright": "^2.12.2",
+    "prettier": "^3.10.1",
+    "typescript": "^6.0.3",
+    "typescript-eslint": "^8.73.0"
+  }
+}

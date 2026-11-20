@@ -1,0 +1,10 @@
+node_modules/
+
+# Wyniki Playwrighta
+test-results/
+playwright-report/
+blob-report/
+playwright/.cache/
+
+# Lokalna konfiguracja — wzór w .env.example
+.env
