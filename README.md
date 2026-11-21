@@ -16,7 +16,7 @@ Zakres i kryteria etapów: [`docs/PLAN.md`](docs/PLAN.md). Decyzje i pułapki:
 | Etap | Zakres                               | Stan         |
 | ---- | ------------------------------------ | ------------ |
 | 0    | Fundament i testy dymne              | ✅ zamknięty |
-| 1    | Uwierzytelnianie, sesja i RBAC       | —            |
+| 1    | Uwierzytelnianie, sesja i RBAC       | ✅ zamknięty |
 | 2    | Repozytorium przypadków              | —            |
 | 3    | Plany, przebiegi i wykonanie         | —            |
 | 4    | Pulpit i raporty                     | —            |
@@ -48,6 +48,39 @@ sesja po przeładowaniu, wylogowanie unieważniające sesję, przekierowanie `/`
 `/dashboard`, sześć modułów z nawigacji, moduły z przyszłych etapów bez linków,
 kafle i sekcje pulpitu, liczba przypadków na kaflu zgodna z API. Stabilne przy
 `--repeat-each=3`.
+
+### Etap 1 — Uwierzytelnianie, sesja i RBAC ✅
+
+**68 testów** w `tests/auth`, `tests/rbac` i `tests/i18n` (razem z dymnymi 91,
+stabilne przy `--repeat-each=3`):
+
+- **Token odświeżający (PK-1042).** Ciasteczko `HttpOnly`, `SameSite=Strict`,
+  `Path=/`, trwałe — sprawdzane w nagłówku `Set-Cookie` i w słoiku przeglądarki;
+  `Secure` wymagany tylko pod `https`. Token jest wyłącznie w ciasteczku.
+  Odświeżenie rotuje token; ponowne użycie unieważnionego wycina całą rodzinę
+  sesji, ale nie inne sesje tego samego konta. Wylogowanie usuwa ciasteczko.
+- **Tokeny poza zasięgiem skryptu.** Ani token dostępu, ani odświeżający nie
+  trafiają do `document.cookie`, `localStorage` ani `sessionStorage` — po
+  logowaniu i po wznowieniu sesji.
+- **Druga osoba w tej samej karcie.** Wylogowanie administratora i logowanie
+  testera bez przeładowania: „Moja praca" i kafel „Czeka na mnie" zgodne
+  z API testera, ekran Integracje odmawia.
+- **Blokada konta (PK-1041).** Piąta zła próba blokuje konto na 15 minut,
+  także dla poprawnego hasła; dziennik ma wpis z adresem IP; udane logowanie
+  zeruje licznik; formularz pokazuje komunikat o blokadzie. Testy pracują na
+  jednorazowych kontach zakładanych w bazie aplikacji (`src/db/`) — kont demo
+  nie dotykają.
+- **Macierz ról.** W interfejsie: nawigacja, „Nowy przypadek", „Nowy przebieg"
+  i „Nowy plan", „Raporty cykliczne", ekran Integracje — dla administratora,
+  koordynatora i testera. W API: 403 z komunikatem o brakującym uprawnieniu
+  dla 11 endpointów, 401 bez tokenu, odrzucenie tokenu z podmienioną rolą.
+  Oczekiwania z `src/data/permissions.ts`, przepisanej macierzy uprawnień.
+- **Przełącznik PL/EN.** Zmiana etykiet na ekranie logowania i w powłoce,
+  wybór po przeładowaniu w obie strony, pierwszeństwo przed językiem profilu,
+  język przeglądarki przy braku wyboru.
+
+Skrypt startowy generuje teraz klienta Prismy po migracjach (`pnpm db:generate`):
+klient sprzed migracji z nowej gałęzi aplikacji wywracał kompilację API.
 
 ---
 
@@ -88,15 +121,20 @@ ich zakończeniu, kontenery zostają.
 ```
 scripts/
   environment.mts  start środowiska aplikacji (webServer Playwrighta, env:start, env:up)
+                   Docker → kontenery → migracje → klient Prismy → seed → pnpm dev
 src/
   api/          klient REST (logowanie, przygotowanie i sprzątanie danych)
   config/       zmienne środowiskowe
-  data/         konta demo per rola
-  fixtures/     test rozszerzony o loginAs, apiAs i Page Objects
+  data/         konta demo per rola, oczekiwana macierz uprawnień
+  db/           jednorazowe konta w bazie aplikacji (test blokady)
+  fixtures/     test rozszerzony o loginAs, apiAs, testAccounts i Page Objects
   pages/        Page Objects
   global-setup.ts
 tests/
   smoke/        testy dymne (etap 0)
+  auth/         sesja, token odświeżający, blokada konta (etap 1)
+  rbac/         macierz ról w interfejsie i w API (etap 1)
+  i18n/         przełącznik PL/EN (etap 1)
 docs/
   PLAN.md           plan etapów
   selector-gaps.md  miejsca bez semantyki — propozycje zmian w aplikacji

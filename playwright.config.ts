@@ -32,9 +32,12 @@ export default defineConfig({
       }
     : undefined,
   globalSetup: './src/global-setup.ts',
+  // Spowolnione akcje (`E2E_SLOW_MO`) nie mieszczą się w domyślnych 30 s na test.
+  timeout: env.slowMo ? 180_000 : 30_000,
   expect: { timeout: 7_000 },
   use: {
     baseURL: env.baseUrl,
+    launchOptions: { slowMo: env.slowMo },
     locale: 'pl-PL',
     timezoneId: 'Europe/Warsaw',
     trace: 'retain-on-failure',

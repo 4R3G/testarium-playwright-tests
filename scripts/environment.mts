@@ -1,7 +1,8 @@
 /**
  * Uruchamia środowisko Testarium przed testami.
  *
- *   node scripts/environment.mts           Docker → kontenery → migracje → seed → `pnpm dev`
+ *   node scripts/environment.mts           Docker → kontenery → migracje → klient Prismy
+ *                                          → seed → `pnpm dev`
  *                                          (pierwszy plan; tak woła go `webServer` Playwrighta)
  *   node scripts/environment.mts --infra   to samo bez `pnpm dev` — kończy się po seedzie
  *
@@ -219,6 +220,10 @@ async function main(): Promise<void> {
   step('Kontenery (pnpm infra:up)', 'pnpm', ['infra:up']);
   await waitForHealthyContainers();
   step('Migracje (pnpm db:deploy)', 'pnpm', ['db:deploy']);
+  // Klient Prismy nie odświeża się sam po migracjach z nowej gałęzi aplikacji —
+  // stary daje dziesiątki błędów TS w watcherze API. Generowanie przy żywym
+  // `pnpm dev` pada na EPERM (watcher trzyma silnik zapytań), więc też tylko tu.
+  step('Klient Prismy (pnpm db:generate)', 'pnpm', ['db:generate']);
   // Seed buduje `@testarium/contracts`, co psuje działający watcher — dlatego
   // tylko tutaj, zanim wystartuje `pnpm dev`, nigdy obok niego.
   step('Dane demonstracyjne (pnpm db:seed)', 'pnpm', ['db:seed']);

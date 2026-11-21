@@ -1,4 +1,5 @@
 import type { Locator, Page } from '@playwright/test';
+import { LocaleSwitch } from './locale-switch';
 
 /** Moduły dostępne w nawigacji: etykieta linku, adres i nagłówek ekranu. */
 export const MODULES = [
@@ -29,6 +30,7 @@ export class AppShell {
   readonly notifications: Locator;
   readonly signOut: Locator;
   readonly pageHeading: Locator;
+  readonly locale: LocaleSwitch;
 
   constructor(private readonly page: Page) {
     this.navigation = page.getByRole('navigation');
@@ -37,6 +39,7 @@ export class AppShell {
     this.notifications = this.sidebar.getByRole('button', { name: 'Powiadomienia' });
     this.signOut = this.sidebar.getByRole('button', { name: 'Wyloguj' });
     this.pageHeading = page.getByRole('main').getByRole('heading', { level: 1 });
+    this.locale = new LocaleSwitch(this.sidebar);
   }
 
   navLink(name: string): Locator {

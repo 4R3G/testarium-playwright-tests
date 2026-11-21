@@ -30,9 +30,13 @@ oba serwery. `reuseExistingServer` lokalnie oznacza, że przy działającej
 aplikacji skrypt w ogóle się nie uruchamia — testy nie dotykają cudzego
 `pnpm dev` ani bazy. W CI (`CI=1`) zajęty adres jest błędem.
 
-**Migracje i seed tylko przed `pnpm dev`, nigdy obok.** `pnpm db:seed` buduje
-`@testarium/contracts`, a drugi `tsup` czyści `dist` działającemu watcherowi
-(pułapka z CLAUDE.md aplikacji). Dlatego skrypt odmawia, gdy front odpowiada,
+**Migracje, klient Prismy i seed tylko przed `pnpm dev`, nigdy obok.** `pnpm db:seed`
+buduje `@testarium/contracts`, a drugi `tsup` czyści `dist` działającemu watcherowi;
+`pnpm db:generate` przy żywym watcherze API pada na `EPERM` (pułapki z CLAUDE.md
+aplikacji). Klienta generujemy przy każdym zimnym starcie, bo po migracjach
+z nowej gałęzi aplikacji stary klient wywraca kompilację API dziesiątkami błędów TS.
+Wygenerowany klient (`apps/api/generated/`) jest poza gitem aplikacji — to nie
+jest zmiana jej kodu. Dlatego skrypt odmawia, gdy front odpowiada,
 a API nie — to zwykle padnięty watcher w działającym `pnpm dev`, którego
 lekarstwem jest restart, a nie druga kopia na zajętym porcie.
 
@@ -59,6 +63,28 @@ z niego sesję przy pierwszym `page.goto`. Koszt to jedno `argon2.verify` na tes
 prawdziwym koncie nabija `failedLoginAttempts`; piąta próba blokuje konto na
 15 minut (PK-1041) i wywraca każdy inny test tej roli. Nieistniejące konto
 dostaje ten sam 401 bez skutków ubocznych.
+
+**Konta do testu blokady (PK-1041) zakłada test w bazie aplikacji.** API nie ma
+endpointu zakładania użytkowników, a blokada konta demo na 15 minut wywraca
+każdy test tej roli. `TestAccounts` (`src/db/`) wstawia do `app_user` konto
+z unikalnym adresem i skrótem hasła przepisanym z konta administratora, a po
+teście je kasuje (tokeny i członkostwo znikają kaskadą, dziennik zostaje
+z pustym `userId`). Konto bez członkostwa jest w aplikacji niewidoczne, a do
+blokady wystarcza — backend sprawdza ją przed hasłem, członkostwo po nim.
+Adres bazy to `DATABASE_URL` z `.env` aplikacji, więc worktree z własną bazą
+działa bez konfiguracji. Poza tym jednym przypadkiem testy do bazy nie sięgają.
+
+**Macierz uprawnień jest przepisana, nie importowana.** `src/data/permissions.ts`
+powtarza `ROLE_PERMISSIONS` aplikacji dla trzech kont demo. Import z
+`@testarium/contracts` dałby testy, które pytają aplikację o jej własną
+macierz — i przechodzą po każdej jej zmianie. Rozgałęzienie po roli siedzi
+na poziomie `describe` (osobny test na gałąź), nie w ciele testu: tytuł mówi,
+czego się spodziewamy, a lint nie ma czego zgłaszać.
+
+**Sprawdzenie uprawnień w API nie może niczego zapisać.** Zapis idzie z pustą
+treścią albo nieistniejącym identyfikatorem. Strażnik uprawnień NestJS działa
+przed walidacją, więc rola bez uprawnienia dostaje 403, a z uprawnieniem —
+400/404. Gdyby strażnik zawiódł, test padnie na statusie, ale nic nie powstanie.
 
 **Selektory po rolach i nazwach, `data-testid` nie istnieje.** Aplikacja ma
 dobrą semantykę (`main`, `navigation`, `aria-label` w rodzaju „Zaznacz PK-1004").
@@ -104,6 +130,16 @@ skryptu służy atrapa aplikacji: katalog z `package.json`, którego `infra:up`,
 `db:deploy` i `db:seed` tylko wypisują tekst, a `dev` stawia serwer HTTP na
 wolnym porcie; uruchomienie z `BASE_URL` i `TESTARIUM_APP_DIR` wskazującymi
 atrapę przechodzi całą ścieżkę razem z zamknięciem procesu po testach.
+
+**`infra:up` pada na „port 9000 is already allocated".** Aplikacja zamieniła
+MinIO na RustFS (`testarium-storage`), a stary kontener `testarium-minio` ma
+`restart: unless-stopped` i wstaje razem z Dockerem, zajmując 9000–9001. Compose
+zgłasza go jako sierotę. Lekarstwo: `docker stop testarium-minio` — skrypt
+startowy go nie rusza, bo to kontener aplikacji.
+
+**Ukryte pole radio klikamy przez etykietę.** Przełącznik PL/EN ma pola radio
+z nazwą dostępną („PL"/„EN"), ale ukryte stylami — `check()` czeka w nieskończoność
+na widoczność. `LocaleSwitch` klika napis, a stan czyta z roli `radio`.
 
 **`.env` aplikacji, nie testów, decyduje o porcie API.** Gdy `global-setup`
 mówi „front działa, ale API nie odpowiada", sprawdź, czy backend wystartował

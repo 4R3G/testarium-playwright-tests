@@ -1,12 +1,16 @@
 import { test as base, expect, type APIRequestContext } from '@playwright/test';
+import type pg from 'pg';
 import { login, TestariumApi, type Session } from '../api/testarium-api';
 import { credentialsOf, type Role } from '../data/users';
+import { createPool, TestAccounts } from '../db/test-accounts';
 import { AppShell } from '../pages/app-shell';
 import { DashboardPage } from '../pages/dashboard.page';
+import { IntegrationsPage } from '../pages/integrations.page';
+import { LOCALE_STORAGE_KEY } from '../pages/locale-switch';
 import { LoginPage } from '../pages/login.page';
-
-/** Klucz, pod którym aplikacja trzyma jawny wybór języka. */
-const LOCALE_STORAGE_KEY = 'testarium.locale';
+import { ReportsPage } from '../pages/reports.page';
+import { RepositoryPage } from '../pages/repository.page';
+import { RunsPage } from '../pages/runs.page';
 
 interface Fixtures {
   /**
@@ -21,12 +25,28 @@ interface Fixtures {
   loginAs: (role: Role) => Promise<Session>;
   /** Klient REST zalogowany na wskazaną rolę — do przygotowania danych. */
   apiAs: (role: Role) => Promise<TestariumApi>;
+  /**
+   * Świeży kontekst żądań z własnym słoikiem ciasteczek — osobna „przeglądarka"
+   * w testach sesji. Zamykany po teście.
+   */
+  newRequest: () => Promise<APIRequestContext>;
+  /** Jednorazowe konta w bazie aplikacji (test blokady); usuwane po teście. */
+  testAccounts: TestAccounts;
   loginPage: LoginPage;
   shell: AppShell;
   dashboard: DashboardPage;
+  repositoryPage: RepositoryPage;
+  runsPage: RunsPage;
+  reportsPage: ReportsPage;
+  integrationsPage: IntegrationsPage;
 }
 
-export const test = base.extend<Fixtures>({
+interface WorkerFixtures {
+  /** Pula połączeń z bazą aplikacji — powstaje dopiero, gdy test jej potrzebuje. */
+  database: pg.Pool;
+}
+
+export const test = base.extend<Fixtures, WorkerFixtures>({
   context: async ({ context }, use) => {
     // Język przypięty do PL, ale tylko gdy nikt nie wybrał innego — inaczej
     // skrypt startowy cofałby przełącznik języka przy każdym przeładowaniu.
@@ -44,14 +64,34 @@ export const test = base.extend<Fixtures>({
     await use((role) => login(context.request, credentialsOf(role)));
   },
 
-  apiAs: async ({ playwright, baseURL }, use) => {
+  newRequest: async ({ playwright, baseURL }, use) => {
     const contexts: APIRequestContext[] = [];
-    await use(async (role) => {
+    await use(async () => {
       const request = await playwright.request.newContext({ baseURL });
       contexts.push(request);
-      return TestariumApi.as(request, credentialsOf(role));
+      return request;
     });
     await Promise.all(contexts.map((request) => request.dispose()));
+  },
+
+  apiAs: async ({ newRequest }, use) => {
+    await use(async (role) => TestariumApi.as(await newRequest(), credentialsOf(role)));
+  },
+
+  database: [
+    // eslint-disable-next-line no-empty-pattern -- Playwright wymaga destrukturyzacji
+    async ({}, use) => {
+      const pool = createPool();
+      await use(pool);
+      await pool.end();
+    },
+    { scope: 'worker' },
+  ],
+
+  testAccounts: async ({ database }, use) => {
+    const accounts = new TestAccounts(database);
+    await use(accounts);
+    await accounts.deleteCreated();
   },
 
   loginPage: async ({ page }, use) => {
@@ -64,6 +104,22 @@ export const test = base.extend<Fixtures>({
 
   dashboard: async ({ page }, use) => {
     await use(new DashboardPage(page));
+  },
+
+  repositoryPage: async ({ page }, use) => {
+    await use(new RepositoryPage(page));
+  },
+
+  runsPage: async ({ page }, use) => {
+    await use(new RunsPage(page));
+  },
+
+  reportsPage: async ({ page }, use) => {
+    await use(new ReportsPage(page));
+  },
+
+  integrationsPage: async ({ page }, use) => {
+    await use(new IntegrationsPage(page));
   },
 });
 

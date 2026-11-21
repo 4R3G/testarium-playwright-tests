@@ -147,9 +147,10 @@ są czyste, README opisuje szybki start.
 
 ## Otwarte kwestie
 
-1. **Dedykowane konto do testu blokady (PK-1041).** API nie ma endpointu
-   zakładania użytkowników. Opcje: konto `e2e-lockout@testarium.local`
-   w seedzie aplikacji albo zdjęcie blokady bezpośrednio w bazie po teście.
+1. ~~**Dedykowane konto do testu blokady (PK-1041).**~~ Rozstrzygnięte w etapie 1:
+   test zakłada jednorazowe konto bezpośrednio w bazie i kasuje je po sobie
+   (`src/db/test-accounts.ts`, uzasadnienie w `CLAUDE.md`). Seed aplikacji
+   zostaje bez zmian.
 2. **Izolacja danych w CI.** Lokalnie testy chodzą po bazie deweloperskiej
    z seedem; w CI baza powinna być świeża przy każdym uruchomieniu.
 3. **Port API zależy od miejsca uruchomienia** (worktree vs katalog główny).
